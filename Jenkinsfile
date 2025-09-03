@@ -59,6 +59,28 @@ pipeline {
         }
       }
     }
+    */
+
+    /* ---------- OPTIONAL: Docker Swarm instead of K8s ---------- */
+     stage('Deploy to Docker Swarm') {
+       steps {
+         script {
+           withCredentials([usernamePassword(credentialsId: 'docker-hub',
+                                            usernameVariable: 'DH_USER',
+                                            passwordVariable: 'DH_PASS')]) {
+             sh """
+               set -eux
+               echo "\$DH_PASS" | docker login -u "\$DH_USER" --password-stdin
+               docker swarm init 2>/dev/null || true
+		sleep 30
+               docker service create --name myhome-web --replicas 2 -p 8076:80 \\
+                  "\$DH_USER/memento-web:${IMAGE_TAG}" || \\
+               docker service update --image "\$DH_USER/myhome:${IMAGE_TAG}" myhome-web
+           """
+           }
+         }
+       }
+     }
   }
 
   post {
