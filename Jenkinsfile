@@ -10,7 +10,7 @@ pipeline {
 
     stage('Archive HTML') {
       steps {
-        // Keeps a copy of the site as a Jenkins artifact
+        // Save HTML file(s) as Jenkins artifact for reference
         archiveArtifacts artifacts: 'index.html', fingerprint: true
       }
     }
@@ -25,52 +25,42 @@ pipeline {
             sh """
               set -eux
               echo "\$DH_PASS" | docker login -u "\$DH_USER" --password-stdin
-              docker build -t "\$DH_USER/memento-web:${tag}" -t "\$DH_USER/memento-web:latest" .
-              docker push "\$DH_USER/memento-web:${tag}"
-              docker push "\$DH_USER/memento-web:latest"
+              
+              # Build nginx image serving your static HTML
+              docker build -t "\$DH_USER/myhome:${tag}" -t "\$DH_USER/myhome:latest" .
+              
+              # Push to Docker Hub
+              docker push "\$DH_USER/myhome:${tag}"
+              docker push "\$DH_USER/myhome:latest"
             """
-            // Expose for next stages
-            env.IMAGE_REPO = "${DH_USER}/memento-web"
+            env.IMAGE_REPO = "${DH_USER}/myhome"
             env.IMAGE_TAG  = tag
           }
         }
       }
     }
-/*
-    stage('Deploy to Kubernetes') {
-      when { expression { return fileExists('k8s/deployment.yaml') } }
+
+    stage('Deploy to Docker Swarm') {
       steps {
-        withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
-          sh """
-            set -eux
-            kubectl apply -f k8s/
-            kubectl set image deployment/memento-web web="${IMAGE_REPO}:${IMAGE_TAG}" --record
-            kubectl rollout status deployment/memento-web --timeout=120s
-          """
+        script {
+          withCredentials([usernamePassword(credentialsId: 'docker-hub',
+                                           usernameVariable: 'DH_USER',
+                                           passwordVariable: 'DH_PASS')]) {
+            sh """
+              set -eux
+              echo "\$DH_PASS" | docker login -u "\$DH_USER" --password-stdin
+              
+              docker swarm init 2>/dev/null || true
+              
+              # Deploy service (update if exists)
+              docker service create --name myhome-web --replicas 2 -p 8080:80 \\
+                  "\$DH_USER/myhome:${IMAGE_TAG}" || \\
+              docker service update --image "\$DH_USER/myhome:${IMAGE_TAG}" myhome-web
+            """
+          }
         }
       }
     }
-    */
-
-    /* ---------- OPTIONAL: Docker Swarm instead of K8s ---------- */
-     stage('Deploy to Docker Swarm') {
-       steps {
-         script {
-           withCredentials([usernamePassword(credentialsId: 'docker-hub',
-                                            usernameVariable: 'DH_USER',
-                                            passwordVariable: 'DH_PASS')]) {
-             sh """
-               set -eux
-               echo "\$DH_PASS" | docker login -u "\$DH_USER" --password-stdin
-               docker swarm init 2>/dev/null || true
-               docker service create --name memento-web --replicas 2 -p 8076:80 \\
-                  "\$DH_USER/memento-web:${IMAGE_TAG}" || \\
-               docker service update --image "\$DH_USER/memento-web:${IMAGE_TAG}" memento-web
-           """
-           }
-         }
-       }
-     }
   }
 
   post {
