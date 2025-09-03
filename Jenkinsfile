@@ -34,7 +34,7 @@ pipeline {
             env.IMAGE_REPO = "${DH_USER}/myhome"
             env.IMAGE_TAG  = tag
           }
-        }
+        }my
       }
     }
 
@@ -58,7 +58,31 @@ pipeline {
           }
         }
       }
-    }
+    } to
+
+    */
+
+    /* ---------- OPTIONAL: Docker Swarm instead of K8s ---------- */
+     stage('Deploy to Docker Swarm') {
+       steps {
+         script {
+           withCredentials([usernamePassword(credentialsId: 'docker-hub',
+                                            usernameVariable: 'DH_USER',
+                                            passwordVariable: 'DH_PASS')]) {
+             sh """
+               set -eux
+               echo "\$DH_PASS" | docker login -u "\$DH_USER" --password-stdin
+               docker swarm init 2>/dev/null || true
+		sleep 30
+               docker service create --name myhome --replicas 2 -p 8076:80 \\
+                  "\$DH_USER/memento-web:${IMAGE_TAG}" || \\
+               docker service update --image "\$DH_USER/memento-web:${IMAGE_TAG}" myhome-web
+           """
+           }
+         }
+       }
+     }
+ main
   }
 
   post {
