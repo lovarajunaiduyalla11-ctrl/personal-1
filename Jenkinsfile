@@ -51,7 +51,7 @@ pipeline {
               docker swarm init 2>/dev/null || true
               
               # Deploy service (update if exists)
-              docker service create --name myhome-web --replicas 2 -p 8080:80 \\
+              docker service create --name myhome-web --replicas 2 -p 8076:80 \\
                   "\$DH_USER/myhome:${IMAGE_TAG}" || \\
               docker service update --image "\$DH_USER/myhome:${IMAGE_TAG}" myhome-web
             """
