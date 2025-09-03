@@ -1,4 +1,3 @@
-// personal-1/Jenkinsfile
 pipeline {
   agent any
   options { timestamps() }
@@ -10,7 +9,6 @@ pipeline {
 
     stage('Archive HTML') {
       steps {
-        // Save HTML file(s) as Jenkins artifact for reference
         archiveArtifacts artifacts: 'index.html', fingerprint: true
       }
     }
